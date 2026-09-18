@@ -12,3 +12,8 @@
 ### 📌 Sonraki Adım:
 - Entity Framework Core (EF Core) NuGet paketlerini projeye eklemek.
 - `BankDbContext.cs` sınıfını yazıp Fluent API ile veritabanı ilişkilerini (1-N, N-N, Precision) yapılandırmak.
+
+
+- [x] Entity Framework Core NuGet paketleri yüklendi.
+- [x] `BankDbContext.cs` yazıldı; Fluent API ile ilişkiler (1-N) ve `DECIMAL(18,2)` hassasiyeti yapılandırıldı.
+- [ ] Veritabanı bağlantı cümlesinin (`appsettings.json`) eklenmesi ve `Program.cs` servisine kaydedilmesi.
