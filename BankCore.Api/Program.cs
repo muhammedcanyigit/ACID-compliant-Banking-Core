@@ -1,5 +1,9 @@
+using System.Text;
 using BankCore.Api.Data;
+using BankCore.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,14 +12,44 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<BankDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Controller ve Swagger Servislerinin Eklenmesi
+// 2. Redis: refresh token'ların saklandığı dağıtık önbellek
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+});
+
+// 3. JWT Auth: gelen isteklerdeki Bearer token'ı doğrulayan katman
+var jwtSection = builder.Configuration.GetSection("Jwt");
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidateAudience = true,
+            ValidAudience = jwtSection["Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["SigningKey"]!)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+builder.Services.AddAuthorization();
+
+// 4. Token servisleri
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IRefreshTokenStore, RedisRefreshTokenStore>();
+
+// 5. Controller ve Swagger Servislerinin Eklenmesi
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 3. HTTP Request Pipeline Yapılandırması
+// 6. HTTP Request Pipeline Yapılandırması
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -23,9 +57,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Sıra önemli: önce "sen kimsin" (Authentication), sonra "bunu yapmaya yetkin var mı" (Authorization)
+app.UseAuthentication();
 app.UseAuthorization();
 
-// 4. Controller Endpoint'lerinin Eşleştirilmesi
+// 7. Controller Endpoint'lerinin Eşleştirilmesi
 app.MapControllers();
 
 app.Run();

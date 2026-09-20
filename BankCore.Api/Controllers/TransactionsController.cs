@@ -2,6 +2,7 @@ using System.Data;
 using BankCore.Api.Data;
 using BankCore.Api.DTOs;
 using BankCore.Api.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ namespace BankCore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class TransactionsController : ControllerBase
 {
     private readonly BankDbContext _context;
