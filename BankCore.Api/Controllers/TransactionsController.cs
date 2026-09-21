@@ -3,6 +3,7 @@ using BankCore.Api.Auth;
 using BankCore.Api.Data;
 using BankCore.Api.DTOs;
 using BankCore.Api.Entities;
+using BankCore.Api.Fraud;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +16,12 @@ namespace BankCore.Api.Controllers;
 public class TransactionsController : ControllerBase
 {
     private readonly BankDbContext _context;
+    private readonly FraudCheckService _fraudCheckService;
 
-    public TransactionsController(BankDbContext context)
+    public TransactionsController(BankDbContext context, FraudCheckService fraudCheckService)
     {
         _context = context;
+        _fraudCheckService = fraudCheckService;
     }
 
     // ACID'in dört harfinin de devrede olduğu tek endpoint:
@@ -49,6 +52,25 @@ public class TransactionsController : ControllerBase
 
         if (sender.Currency != receiver.Currency)
             return BadRequest("Farklı para birimleri arasında transfer şu an desteklenmiyor.");
+
+        var flagReason = await _fraudCheckService.EvaluateAsync(request, sender, _context);
+        if (flagReason is not null)
+        {
+            var flaggedTx = new Transaction
+            {
+                SenderAccountId = sender.Id,
+                ReceiverAccountId = receiver.Id,
+                Amount = request.Amount,
+                Status = "Flagged",
+                Description = request.Description,
+                FlagReason = flagReason,
+            };
+            _context.Transactions.Add(flaggedTx);
+            await _context.SaveChangesAsync();
+            await dbTransaction.CommitAsync();
+
+            return UnprocessableEntity(new { message = "İşlem şüpheli bulundu ve incelemeye alındı.", rule = flagReason });
+        }
 
         if (sender.Balance < request.Amount)
         {
@@ -107,6 +129,19 @@ public class TransactionsController : ControllerBase
         return ToResponse(transaction);
     }
 
+    // Fraud analisti/Admin, kurallara takılan tüm işlemleri tek yerden görebilir.
+    [HttpGet("flagged")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<TransactionResponse>>> GetFlagged()
+    {
+        var flagged = await _context.Transactions
+            .Where(t => t.Status == "Flagged")
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+        return flagged.Select(ToResponse).ToList();
+    }
+
     private static TransactionResponse ToResponse(Transaction t) =>
-        new(t.Id, t.SenderAccountId, t.ReceiverAccountId, t.Amount, t.Status, t.Description, t.CreatedAt);
+        new(t.Id, t.SenderAccountId, t.ReceiverAccountId, t.Amount, t.Status, t.Description, t.FlagReason, t.CreatedAt);
 }

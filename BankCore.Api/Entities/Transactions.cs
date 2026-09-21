@@ -10,8 +10,11 @@ public class Transaction
     public decimal Amount { get; set; } 
     
     // Status: Pending, Completed, Failed, Flagged
-    public string Status { get; set; } = "Pending"; 
+    public string Status { get; set; } = "Pending";
     public string? Description { get; set; }
+
+    // Flagged olduğunda hangi fraud kuralının tetiklendiğini tutar (ör. "HighAmount").
+    public string? FlagReason { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation Properties: İlişkili hesaplar

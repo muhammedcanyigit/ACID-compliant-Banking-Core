@@ -1,5 +1,6 @@
 using System.Text;
 using BankCore.Api.Data;
+using BankCore.Api.Fraud;
 using BankCore.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,12 @@ builder.Services.AddAuthorization();
 // 4. Token servisleri
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenStore, RedisRefreshTokenStore>();
+
+// 4b. Fraud Engine: kural tabanlı, birden fazla IFraudRule sırayla denenir
+builder.Services.AddScoped<IFraudRule, HighAmountRule>();
+builder.Services.AddScoped<IFraudRule, VelocityRule>();
+builder.Services.AddScoped<IFraudRule, NewAccountHighAmountRule>();
+builder.Services.AddScoped<FraudCheckService>();
 
 // 5. Controller ve Swagger Servislerinin Eklenmesi
 builder.Services.AddControllers();

@@ -23,5 +23,6 @@ public record TransactionResponse(
     decimal Amount,
     string Status,
     string? Description,
+    string? FlagReason,
     DateTime CreatedAt
 );
