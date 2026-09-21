@@ -24,6 +24,9 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Claim tiplerini biz nasıl yazdıysak (sub, email, role) öyle kalsın;
+        // ASP.NET'in eski WS-Federation isimlerine otomatik çevirmesini istemiyoruz.
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

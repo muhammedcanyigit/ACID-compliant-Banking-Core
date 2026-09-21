@@ -1,4 +1,5 @@
 using System.Data;
+using BankCore.Api.Auth;
 using BankCore.Api.Data;
 using BankCore.Api.DTOs;
 using BankCore.Api.Entities;
@@ -38,6 +39,10 @@ public class TransactionsController : ControllerBase
 
         if (sender is null || receiver is null)
             return NotFound("Gönderen veya alıcı hesap bulunamadı.");
+
+        // Bir müşteri sadece kendi hesabından para gönderebilir; Admin herhangi bir hesaptan gönderebilir.
+        if (sender.CustomerId != User.GetCustomerId() && !User.IsAdmin())
+            return Forbid();
 
         if (!sender.IsActive || !receiver.IsActive)
             return BadRequest("Hesaplardan biri aktif değil.");
@@ -81,11 +86,24 @@ public class TransactionsController : ControllerBase
         return Ok(ToResponse(transaction));
     }
 
+    // Bir işlemi sadece gönderen ya da alıcı hesabın sahibi (ya da Admin) görebilir.
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<TransactionResponse>> GetById(Guid id)
     {
-        var transaction = await _context.Transactions.FindAsync(id);
+        var transaction = await _context.Transactions
+            .Include(t => t.SenderAccount)
+            .Include(t => t.ReceiverAccount)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
         if (transaction is null) return NotFound();
+
+        var customerId = User.GetCustomerId();
+        var isParty = transaction.SenderAccount.CustomerId == customerId
+                      || transaction.ReceiverAccount.CustomerId == customerId;
+
+        if (!isParty && !User.IsAdmin())
+            return Forbid();
+
         return ToResponse(transaction);
     }
 
